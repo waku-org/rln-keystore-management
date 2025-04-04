@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation: animateIn 0.3s ease-in-out forwards;
+  }
+  
+  .fade-in-50 {
+    opacity: 0;
+    animation-name: fadeIn50;
+  }
+  
+  @keyframes fadeIn50 {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  .duration-300 {
+    animation-duration: 300ms;
+  }
+
+  .typing-effect {
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 2px solid theme('colors.primary.DEFAULT');
+    width: 0;
+    animation: typing 3s steps(40, end) forwards, blink-caret 1s step-end infinite;
+  }
+  
+  @keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+  }
+  
+  @keyframes blink-caret {
+    from, to { border-color: transparent }
+    50% { border-color: theme('colors.primary.DEFAULT') }
+  }
+}
+
+@layer components {
+  .terminal-window {
+    @apply bg-terminal-background border border-terminal-border relative rounded-md overflow-hidden;
+    box-shadow: 0 0 5px theme('colors.terminal.border'), inset 0 0 5px rgba(0, 0, 0, 0.5);
+  }
+  
+  .terminal-header {
+    @apply bg-muted px-4 py-2 flex items-center justify-between border-b border-terminal-border;
+  }
+  
+  .terminal-content {
+    @apply p-4 font-mono text-sm relative;
+  }
+  
+  .terminal-content::before {
+    content: '';
+    @apply absolute top-0 left-0 right-0 bottom-0 pointer-events-none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.1),
+      rgba(0, 0, 0, 0.1) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+  }
+  
+  .terminal-text {
+    @apply text-terminal-text;
+  }
+  
+  .scan-line {
+    @apply absolute top-0 left-0 w-full h-[2px] bg-white/10 opacity-75 pointer-events-none;
+    animation: scan-line 6s linear infinite;
+  }
+  
+  .cursor-blink::after {
+    content: '|';
+    @apply animate-blink ml-[1px];
+  }
+  
+  .glow-text {
+    text-shadow: 0 0 5px currentColor;
+  }
+  
+  .button-glow {
+    @apply transition-all duration-300;
+    box-shadow: 0 0 5px theme('colors.primary.DEFAULT');
+  }
+  
+  .button-glow:hover {
+    box-shadow: 0 0 10px theme('colors.primary.DEFAULT'), 0 0 20px theme('colors.primary.DEFAULT');
+  }
+  
+  .hexagon-bg {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5.66987L55 20.8349V51.1651L30 66.3301L5 51.1651V20.8349L30 5.66987ZM30 0L0 17.3205V51.9616L30 69.2821L60 51.9616V17.3205L30 0Z' fill='%2320202A' fill-opacity='0.3'/%3E%3C/svg%3E");
+    background-size: 60px 60px;
+  }
+  
+  .circuit-bg {
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10 H90 V90 H10 Z' fill='none' stroke='%2320202A' stroke-width='1'/%3E%3Cpath d='M30 30 H70 V70 H30 Z' fill='none' stroke='%2320202A' stroke-width='1'/%3E%3Cpath d='M50 10 V30 M50 70 V90 M10 50 H30 M70 50 H90' stroke='%2320202A' stroke-width='1'/%3E%3C/svg%3E");
+    background-size: 100px 100px;
+  }
+  
+  .glitch {
+    position: relative;
+    animation: glitch-animation 2s infinite;
+  }
+  
+  @keyframes glitch-animation {
+    0% {
+      transform: none;
+      opacity: 1;
+    }
+    7% {
+      transform: skew(-0.5deg, -0.9deg);
+      opacity: 0.75;
+    }
+    10% {
+      transform: none;
+      opacity: 1;
+    }
+    27% {
+      transform: none;
+      opacity: 1;
+    }
+    30% {
+      transform: skew(0.8deg, -0.1deg);
+      opacity: 0.75;
+    }
+    35% {
+      transform: none;
+      opacity: 1;
+    }
+    52% {
+      transform: none;
+      opacity: 1;
+    }
+    55% {
+      transform: skew(-1deg, 0.2deg);
+      opacity: 0.75;
+    }
+    50% {
+      transform: none;
+      opacity: 1;
+    }
+    72% {
+      transform: none;
+      opacity: 1;
+    }
+    75% {
+      transform: skew(0.4deg, 1deg);
+      opacity: 0.75;
+    }
+    80% {
+      transform: none;
+      opacity: 1;
+    }
+    100% {
+      transform: none;
+      opacity: 1;
+    }
+  }
+}
