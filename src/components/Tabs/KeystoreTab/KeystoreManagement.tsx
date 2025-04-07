@@ -334,6 +334,7 @@ export function KeystoreManagement() {
                                   <MembershipDetails
                                     membershipInfo={membershipInfo}
                                     copyToClipboard={copyToClipboard}
+                                    hash={hash}
                                   />
                                 </div>
                               )}

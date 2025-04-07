@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
-import { Copy } from 'lucide-react';
+import { Copy, Clock, Trash2, Wallet } from 'lucide-react';
 import { ethers } from 'ethers';
 import { MembershipState } from '@waku/rln';
+import { useRLN } from '../contexts/rln/RLNContext';
+import { toast } from 'sonner';
 
 interface MembershipDetailsProps {
   membershipInfo: {
@@ -21,17 +23,144 @@ interface MembershipDetailsProps {
     token: string;
   };
   copyToClipboard: (text: string) => void;
+  hash: string;
 }
 
-export function MembershipDetails({ membershipInfo, copyToClipboard }: MembershipDetailsProps) {
+export function MembershipDetails({ membershipInfo, copyToClipboard, hash }: MembershipDetailsProps) {
+  const { extendMembership, eraseMembership, withdrawDeposit } = useRLN();
+  const [isLoading, setIsLoading] = useState<{[key: string]: boolean}>({});
+  const [password, setPassword] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [actionType, setActionType] = useState<'extend' | 'erase' | 'withdraw' | null>(null);
+
+  const handleAction = async (type: 'extend' | 'erase' | 'withdraw') => {
+    if (!password) {
+      setActionType(type);
+      setShowPasswordInput(true);
+      return;
+    }
+
+    setIsLoading(prev => ({ ...prev, [type]: true }));
+    try {
+      let result;
+      switch (type) {
+        case 'extend':
+          result = await extendMembership(hash, password);
+          break;
+        case 'erase':
+          result = await eraseMembership(hash, password);
+          break;
+        case 'withdraw':
+          result = await withdrawDeposit(hash, password);
+          break;
+      }
+
+      if (result.success) {
+        toast.success(`Successfully ${type}ed membership`);
+        setPassword('');
+        setShowPasswordInput(false);
+        setActionType(null);
+      } else {
+        toast.error(result.error || `Failed to ${type} membership`);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Failed to ${type} membership`);
+    } finally {
+      setIsLoading(prev => ({ ...prev, [type]: false }));
+    }
+  };
+
+  // Check if membership is in grace period
+  const isInGracePeriod = membershipInfo.state === MembershipState.GracePeriod;
+  
+  // Check if membership is erased and awaiting withdrawal
+  const canWithdraw = membershipInfo.state === MembershipState.ErasedAwaitsWithdrawal;
+
+  // Check if membership can be erased (Active or GracePeriod)
+  const canErase = membershipInfo.state === MembershipState.Active || membershipInfo.state === MembershipState.GracePeriod;
+
   return (
     <div className="mt-3 space-y-2 border-t border-terminal-border/40 pt-3 animate-in fade-in-50 duration-300">
-      <div className="flex items-center mb-2">
-        <span className="text-primary font-mono font-medium mr-2">{">"}</span>
-        <h3 className="text-sm font-mono font-semibold text-primary">
-          Membership Details
-        </h3>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center">
+          <span className="text-primary font-mono font-medium mr-2">{">"}</span>
+          <h3 className="text-sm font-mono font-semibold text-primary">
+            Membership Details
+          </h3>
+        </div>
+        <div className="flex items-center space-x-2">
+          {isInGracePeriod && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-warning-DEFAULT hover:text-warning-DEFAULT hover:border-warning-DEFAULT flex items-center gap-1"
+              onClick={() => handleAction('extend')}
+              disabled={isLoading.extend}
+            >
+              <Clock className="w-3 h-3" />
+              <span>{isLoading.extend ? 'Extending...' : 'Extend'}</span>
+            </Button>
+          )}
+          {canErase && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:border-destructive flex items-center gap-1"
+              onClick={() => handleAction('erase')}
+              disabled={isLoading.erase}
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>{isLoading.erase ? 'Erasing...' : 'Erase'}</span>
+            </Button>
+          )}
+          {canWithdraw && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-accent hover:text-accent hover:border-accent flex items-center gap-1"
+              onClick={() => handleAction('withdraw')}
+              disabled={isLoading.withdraw}
+            >
+              <Wallet className="w-3 h-3" />
+              <span>{isLoading.withdraw ? 'Withdrawing...' : 'Withdraw'}</span>
+            </Button>
+          )}
+        </div>
       </div>
+
+      {showPasswordInput && (
+        <div className="mb-4 space-y-2 border-b border-terminal-border pb-4">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter keystore password"
+            className="w-full px-3 py-2 border border-terminal-border rounded-md bg-terminal-background text-foreground font-mono focus:ring-1 focus:ring-accent focus:border-accent text-sm"
+          />
+          <div className="flex space-x-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => handleAction(actionType!)}
+              disabled={!password || isLoading[actionType!]}
+            >
+              Confirm
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setShowPasswordInput(false);
+                setPassword('');
+                setActionType(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2 text-xs font-mono">
         <div className="grid grid-cols-2 gap-4">
           {/* Membership State */}

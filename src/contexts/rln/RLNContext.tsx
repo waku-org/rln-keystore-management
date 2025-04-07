@@ -54,7 +54,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
   const [rateMaxLimit, setRateMaxLimit] = useState<number>(0);
 
   const { saveCredentials: saveToKeystore, getDecryptedCredential } = useKeystore();
-  
+
   // Listen for wallet connection
   useEffect(() => {
     const checkWallet = async () => {
@@ -359,33 +359,31 @@ export function RLNProvider({ children }: { children: ReactNode }) {
 
 
   const getMembershipInfo = async (hash: string, password: string) => {
-      if (!rln || !rln.contract) {
-        throw new Error('RLN not initialized or contract not available');
-      }
+    if (!rln || !rln.contract) {
+      throw new Error('RLN not initialized or contract not available');
+    }
 
-      const credential = await getDecryptedCredential(hash, password); 
-      if (!credential) {
-        throw new Error('Could not decrypt credential');
-      }
+    const credential = await getDecryptedCredential(hash, password);
+    if (!credential) {
+      throw new Error('Could not decrypt credential');
+    }
 
-     
-      try {
-        const membershipInfo = await rln.contract.getMembershipInfo(credential.identity.IDCommitmentBigInt);
-        if (!membershipInfo) {
-          throw new Error('Could not fetch membership info');
-        }
-        return {
-          ...membershipInfo,
-          address: rln.contract.address,
-          chainId: LINEA_SEPOLIA_CONFIG.chainId.toString(),
-          treeIndex: Number(membershipInfo.index.toString()),
-          rateLimit: Number(membershipInfo.rateLimit.toString())
-        }
-      } catch (error) {
-        console.log("error", error);
-        throw error;
+    try {
+      const membershipInfo = await rln.contract.getMembershipInfo(credential.identity.IDCommitmentBigInt);
+      if (!membershipInfo) {
+        throw new Error('Could not fetch membership info');
       }
-      
+      return {
+        ...membershipInfo,
+        address: rln.contract.address,
+        chainId: LINEA_SEPOLIA_CONFIG.chainId.toString(),
+        treeIndex: Number(membershipInfo.index.toString()),
+        rateLimit: Number(membershipInfo.rateLimit.toString())
+      }
+    } catch (error) {
+      console.log("error", error);
+      throw error;
+    }
   };
 
   const extendMembership = async (hash: string, password: string) => {
@@ -399,10 +397,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         throw new Error('Could not decrypt credential');
       }
 
-      // Convert IDCommitment to hex string
-      const idCommitmentHex = ethers.utils.hexlify(credential.identity.IDCommitment);
-      
-      await rln.contract.extendMembership(idCommitmentHex);
+      await rln.contract.extendMembership(credential.identity.IDCommitmentBigInt);
       return { success: true };
     } catch (err) {
       console.error('Error extending membership:', err);
@@ -424,10 +419,8 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         throw new Error('Could not decrypt credential');
       }
 
-      // Convert IDCommitment to hex string
-      const idCommitmentHex = ethers.utils.hexlify(credential.identity.IDCommitment);
       
-      await rln.contract.eraseMembership(idCommitmentHex);
+      await rln.contract.eraseMembership(credential.identity.IDCommitmentBigInt);
       return { success: true };
     } catch (err) {
       console.error('Error erasing membership:', err);
