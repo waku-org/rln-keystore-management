@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { RLNImplementationToggle } from '../../RLNImplementationToggle';
 import { KeystoreEntity } from '@waku/rln';
-import { useAppState } from '../../../contexts/AppStateContext';
 import { useRLN } from '../../../contexts/rln/RLNContext';
 import { useWallet } from '../../../contexts/wallet';
 import { RLNInitButton } from '../../RLNinitButton';
@@ -11,9 +10,9 @@ import { TerminalWindow } from '../../ui/terminal-window';
 import { Slider } from '../../ui/slider';
 import { Button } from '../../ui/button';
 import { membershipRegistration, type ContentSegment } from '../../../content/index';
+import { toast } from 'sonner';
 
 export function MembershipRegistration() {
-  const { setGlobalError } = useAppState();
   const { registerMembership, isInitialized, isStarted, rateMinLimit, rateMaxLimit, error } = useRLN();
   const { isConnected, chainId } = useWallet();
 
@@ -34,9 +33,9 @@ export function MembershipRegistration() {
 
   useEffect(() => {
     if (error) {
-      setGlobalError(error);
+      toast.error(error);
     }
-  }, [error, setGlobalError]);
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

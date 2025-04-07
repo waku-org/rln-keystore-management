@@ -47,7 +47,6 @@ export function KeystoreManagement() {
     getMembershipInfo
   } = useRLN();
 
-  const { setGlobalError } = useAppState();
   const [exportPassword, setExportPassword] = useState<string>('');
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null);
   const [viewPassword, setViewPassword] = useState<string>('');
@@ -59,14 +58,14 @@ export function KeystoreManagement() {
 
   React.useEffect(() => {
     if (error) {
-      setGlobalError(error);
+      toast.error(error);
     }
-  }, [error, setGlobalError]);
+  }, [error]);
 
   const handleExportKeystoreCredential = async (hash: string) => {
     try {
       if (!exportPassword) {
-        setGlobalError('Please enter your keystore password to export');
+        toast.error('Please enter your keystore password to export');
         return;
       }
       const keystore = await exportCredential(hash, exportPassword);
@@ -74,7 +73,7 @@ export function KeystoreManagement() {
       setExportPassword('');
       setSelectedCredential(null);
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to export credential');
+      toast.error(err instanceof Error ? err.message : 'Failed to export credential');
     }
   };
 
@@ -83,10 +82,10 @@ export function KeystoreManagement() {
       const keystore = await readKeystoreFromFile();
       const success = importKeystore(keystore);
       if (!success) {
-        setGlobalError('Failed to import keystore');
+        toast.error('Failed to import keystore');
       }
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to import keystore');
+      toast.error(err instanceof Error ? err.message : 'Failed to import keystore');
     }
   };
 
@@ -94,7 +93,7 @@ export function KeystoreManagement() {
     try {
       removeCredential(hash);
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to remove credential');
+      toast.error(err instanceof Error ? err.message : 'Failed to remove credential');
     }
   };
 
