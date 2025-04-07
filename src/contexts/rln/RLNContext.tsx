@@ -98,6 +98,12 @@ export function RLNProvider({ children }: { children: ReactNode }) {
   
   // Reset RLN state when implementation changes
   useEffect(() => {
+    console.log('Implementation changed, resetting state:', {
+      oldRln: !!rln,
+      oldIsInitialized: isInitialized,
+      oldIsStarted: isStarted,
+      newImplementation: implementation
+    });
     setRln(null);
     setIsInitialized(false);
     setIsStarted(false);
@@ -111,11 +117,13 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       setError(null);
       setIsLoading(true);
       
-      if (!rln) {
+      let rlnInstance = rln;
+      
+      if (!rlnInstance) {
         console.log(`Creating RLN ${implementation} instance...`);
         
         try {
-          const rlnInstance = await createRLNImplementation(implementation);
+          rlnInstance = await createRLNImplementation(implementation);
           
           console.log("RLN instance created successfully:", !!rlnInstance);
           setRln(rlnInstance);
@@ -130,17 +138,17 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("RLN instance already exists, skipping creation");
       }
       
-      if (isConnected && signer && rln && !isStarted) {
+      if (isConnected && signer && rlnInstance && !isStarted) {
         console.log("Starting RLN with signer...");
         try {          
-          await rln.start({ signer });
+          await rlnInstance.start({ signer });
           
           setIsStarted(true);
           console.log("RLN started successfully, isStarted set to true");
 
           try {
-            const minLimit = await rln.contract?.getMinRateLimit();
-            const maxLimit = await rln.contract?.getMaxRateLimit();
+            const minLimit = await rlnInstance.contract?.getMinRateLimit();
+            const maxLimit = await rlnInstance.contract?.getMaxRateLimit();
             if (minLimit !== undefined && maxLimit !== undefined) {
               setRateMinLimit(minLimit);
               setRateMaxLimit(maxLimit);
@@ -159,7 +167,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("Skipping RLN start because:", {
           isConnected,
           hasSigner: !!signer,
-          hasRln: !!rln,
+          hasRln: !!rlnInstance,
           isAlreadyStarted: isStarted
         });
       }
@@ -173,6 +181,14 @@ export function RLNProvider({ children }: { children: ReactNode }) {
 
   // Auto-initialize effect for Light implementation
   useEffect(() => {
+    console.log('Auto-init check:', {
+      implementation,
+      isConnected,
+      hasSigner: !!signer,
+      isInitialized,
+      isStarted,
+      isLoading
+    });
     if (implementation === 'light' && isConnected && signer && !isInitialized && !isStarted && !isLoading) {
       console.log('Auto-initializing Light RLN implementation...');
       initializeRLN();
