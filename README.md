@@ -38,6 +38,11 @@ When registering for RLN membership, you'll need to complete two transactions:
 
 If you encounter an "ERC20: insufficient allowance" error, it means the token approval transaction was not completed successfully. Please try again and make sure to approve the token spending in your wallet.
 
+## Contracts
+
+1. Waku Testnet Tokens: 0x185A0015aC462a0aECb81beCc0497b649a64B9ea
+2. RLN Registration Contract: 0xB9cd878C90E49F797B4431fBF4fb333108CB90e6
+
 ## TODO
 - [ ] add info about using with nwaku/nwaku-compose/waku-simulator
 - [x] fix rate limit fetch
