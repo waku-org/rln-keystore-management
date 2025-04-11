@@ -31,7 +31,7 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
   const [decryptedCredentials, setDecryptedCredentials] = useState<KeystoreEntity | null>(null);
 
   // Initialize keystore
-  useEffect(() => {
+  useEffect(() => { 
     try {
       const storedKeystore = localStorage.getItem(LOCAL_STORAGE_KEYSTORE_KEY);
       let keystoreInstance: Keystore;
@@ -197,7 +197,9 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     exportEntireKeystore,
     importKeystore,
     removeCredential,
-    getDecryptedCredential
+    getDecryptedCredential,
+    decryptedCredentials,
+    hideCredentials: () => {},
   };
 
   return (

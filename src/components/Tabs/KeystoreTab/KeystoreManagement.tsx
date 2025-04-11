@@ -5,7 +5,6 @@ import { useKeystore } from '../../../contexts/keystore/KeystoreContext';
 import { useRLN } from '../../../contexts/rln/RLNContext';
 import { readKeystoreFromFile, saveKeystoreCredentialToFile } from '../../../utils/keystore';
 import { DecryptedCredentials, MembershipInfo, MembershipState } from '@waku/rln';
-import { useAppState } from '../../../contexts/AppStateContext';
 import { TerminalWindow } from '../../ui/terminal-window';
 import { Button } from '../../ui/button';
 import { Copy, Eye, Download, Trash2, ArrowDownToLine } from 'lucide-react';

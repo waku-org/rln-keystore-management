@@ -5,9 +5,11 @@ export interface WalletContextType {
     address: string | null;
     signer: ethers.Signer | null;
     balance: string | null;
+    wttBalance: string | null;
     chainId: number | null;
     connectWallet: () => Promise<void>;
     disconnectWallet: () => void;
+    mintWTT: (amount: number) => Promise<void>;
     error: string | null;
   }
 
