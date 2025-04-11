@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { KeystoreEntity, RLNCredentialsManager } from '@waku/rln';
+import { KeystoreEntity, MembershipInfo, RLNCredentialsManager } from '@waku/rln';
 import { createRLNImplementation } from './implementations';
 import { useRLNImplementation } from './RLNImplementationContext';
 import { ethers } from 'ethers';
@@ -19,6 +19,15 @@ interface RLNContextType {
     error?: string; 
     credentials?: KeystoreEntity;
     keystoreHash?: string;
+  }>;
+  extendMembership: (hash: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  eraseMembership: (hash: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  withdrawDeposit: (hash: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  getMembershipInfo: (hash: string, password: string) => Promise<MembershipInfo & {
+    address: string;
+    chainId: string;
+    treeIndex: number;
+    rateLimit: number;
   }>;
   rateMinLimit: number;
   rateMaxLimit: number;
@@ -44,8 +53,8 @@ export function RLNProvider({ children }: { children: ReactNode }) {
   const [rateMinLimit, setRateMinLimit] = useState<number>(0);
   const [rateMaxLimit, setRateMaxLimit] = useState<number>(0);
 
-  const { saveCredentials: saveToKeystore } = useKeystore();
-  
+  const { saveCredentials: saveToKeystore, getDecryptedCredential } = useKeystore();
+
   // Listen for wallet connection
   useEffect(() => {
     const checkWallet = async () => {
@@ -89,6 +98,12 @@ export function RLNProvider({ children }: { children: ReactNode }) {
   
   // Reset RLN state when implementation changes
   useEffect(() => {
+    console.log('Implementation changed, resetting state:', {
+      oldRln: !!rln,
+      oldIsInitialized: isInitialized,
+      oldIsStarted: isStarted,
+      newImplementation: implementation
+    });
     setRln(null);
     setIsInitialized(false);
     setIsStarted(false);
@@ -102,11 +117,13 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       setError(null);
       setIsLoading(true);
       
-      if (!rln) {
+      let rlnInstance = rln;
+      
+      if (!rlnInstance) {
         console.log(`Creating RLN ${implementation} instance...`);
         
         try {
-          const rlnInstance = await createRLNImplementation(implementation);
+          rlnInstance = await createRLNImplementation(implementation);
           
           console.log("RLN instance created successfully:", !!rlnInstance);
           setRln(rlnInstance);
@@ -121,17 +138,17 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("RLN instance already exists, skipping creation");
       }
       
-      if (isConnected && signer && rln && !isStarted) {
+      if (isConnected && signer && rlnInstance && !isStarted) {
         console.log("Starting RLN with signer...");
         try {          
-          await rln.start({ signer });
+          await rlnInstance.start({ signer });
           
           setIsStarted(true);
           console.log("RLN started successfully, isStarted set to true");
 
           try {
-            const minLimit = await rln.contract?.getMinRateLimit();
-            const maxLimit = await rln.contract?.getMaxRateLimit();
+            const minLimit = await rlnInstance.contract?.getMinRateLimit();
+            const maxLimit = await rlnInstance.contract?.getMaxRateLimit();
             if (minLimit !== undefined && maxLimit !== undefined) {
               setRateMinLimit(minLimit);
               setRateMaxLimit(maxLimit);
@@ -150,7 +167,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("Skipping RLN start because:", {
           isConnected,
           hasSigner: !!signer,
-          hasRln: !!rln,
+          hasRln: !!rlnInstance,
           isAlreadyStarted: isStarted
         });
       }
@@ -164,6 +181,14 @@ export function RLNProvider({ children }: { children: ReactNode }) {
 
   // Auto-initialize effect for Light implementation
   useEffect(() => {
+    console.log('Auto-init check:', {
+      implementation,
+      isConnected,
+      hasSigner: !!signer,
+      isInitialized,
+      isStarted,
+      isLoading
+    });
     if (implementation === 'light' && isConnected && signer && !isInitialized && !isStarted && !isLoading) {
       console.log('Auto-initializing Light RLN implementation...');
       initializeRLN();
@@ -348,6 +373,111 @@ export function RLNProvider({ children }: { children: ReactNode }) {
     }
   };
 
+
+  const getMembershipInfo = async (hash: string, password: string) => {
+    if (!rln || !rln.contract) {
+      throw new Error('RLN not initialized or contract not available');
+    }
+
+    const credential = await getDecryptedCredential(hash, password);
+    if (!credential) {
+      throw new Error('Could not decrypt credential');
+    }
+
+    try {
+      const membershipInfo = await rln.contract.getMembershipInfo(credential.identity.IDCommitmentBigInt);
+      if (!membershipInfo) {
+        throw new Error('Could not fetch membership info');
+      }
+      return {
+        ...membershipInfo,
+        address: rln.contract.address,
+        chainId: LINEA_SEPOLIA_CONFIG.chainId.toString(),
+        treeIndex: Number(membershipInfo.index.toString()),
+        rateLimit: Number(membershipInfo.rateLimit.toString())
+      }
+    } catch (error) {
+      console.log("error", error);
+      throw error;
+    }
+  };
+
+  const extendMembership = async (hash: string, password: string) => {
+    try {
+      if (!rln || !rln.contract) {
+        throw new Error('RLN not initialized or contract not available');
+      }
+
+      const credential = await getDecryptedCredential(hash, password);
+      if (!credential) {
+        throw new Error('Could not decrypt credential');
+      }
+
+      await rln.contract.extendMembership(credential.identity.IDCommitmentBigInt);
+      return { success: true };
+    } catch (err) {
+      console.error('Error extending membership:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to extend membership'
+      };
+    }
+  };
+
+  const eraseMembership = async (hash: string, password: string) => {
+    try {
+      if (!rln || !rln.contract) {
+        throw new Error('RLN not initialized or contract not available');
+      }
+
+      const credential = await getDecryptedCredential(hash, password);
+      if (!credential) {
+        throw new Error('Could not decrypt credential');
+      }
+
+      
+      await rln.contract.eraseMembership(credential.identity.IDCommitmentBigInt);
+      return { success: true };
+    } catch (err) {
+      console.error('Error erasing membership:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to erase membership'
+      };
+    }
+  };
+
+  const withdrawDeposit = async (hash: string, password: string) => {
+    try {
+      if (!rln || !rln.contract) {
+        throw new Error('RLN not initialized or contract not available');
+      }
+
+      const credential = await getDecryptedCredential(hash, password);
+      if (!credential) {
+        throw new Error('Could not decrypt credential');
+      }
+
+      // Get token address from config
+      const tokenAddress = LINEA_SEPOLIA_CONFIG.tokenAddress;
+      const userAddress = await signer?.getAddress();
+      
+      if (!userAddress) {
+        throw new Error('No signer available');
+      }
+      
+      // Call withdraw with token address and holder
+      await rln.contract.withdraw(tokenAddress, userAddress);
+      return { success: true };
+    } catch (err) {
+      console.error('Error withdrawing deposit:', err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to withdraw deposit'
+      };
+    }
+  };
+
   return (
     <RLNContext.Provider
       value={{
@@ -357,6 +487,10 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         error,
         initializeRLN,
         registerMembership,
+        extendMembership,
+        eraseMembership,
+        withdrawDeposit,
+        getMembershipInfo,
         rateMinLimit,
         rateMaxLimit,
         getCurrentRateLimit,

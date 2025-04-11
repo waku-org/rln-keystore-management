@@ -1,15 +1,36 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useKeystore } from '../../../contexts/keystore';
+import { useKeystore } from '../../../contexts/keystore/KeystoreContext';
+import { useRLN } from '../../../contexts/rln/RLNContext';
 import { readKeystoreFromFile, saveKeystoreCredentialToFile } from '../../../utils/keystore';
-import { DecryptedCredentials } from '@waku/rln';
+import { DecryptedCredentials, MembershipInfo, MembershipState } from '@waku/rln';
 import { useAppState } from '../../../contexts/AppStateContext';
 import { TerminalWindow } from '../../ui/terminal-window';
 import { Button } from '../../ui/button';
 import { Copy, Eye, Download, Trash2, ArrowDownToLine } from 'lucide-react';
 import { KeystoreExporter } from '../../KeystoreExporter';
 import { keystoreManagement, type ContentSegment } from '../../../content/index';
+import { ethers } from 'ethers';
+import { toast } from 'sonner';
+import { CredentialDetails } from '@/components/CredentialDetails';
+import { MembershipDetails } from '@/components/MembershipDetails';
+
+interface ExtendedMembershipInfo extends Omit<MembershipInfo, 'state'> {
+  address: string;
+  chainId: string;
+  treeIndex: number;
+  rateLimit: number;
+  idCommitment: string;
+  startBlock: number;
+  endBlock: number;
+  state: MembershipState;
+  depositAmount: ethers.BigNumber;
+  activeDuration: number;
+  gracePeriodDuration: number;
+  holder: string;
+  token: string;
+}
 
 export function KeystoreManagement() {
   const { 
@@ -21,7 +42,11 @@ export function KeystoreManagement() {
     removeCredential,
     getDecryptedCredential
   } = useKeystore();
-  const { setGlobalError } = useAppState();
+
+  const {
+    getMembershipInfo
+  } = useRLN();
+
   const [exportPassword, setExportPassword] = useState<string>('');
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null);
   const [viewPassword, setViewPassword] = useState<string>('');
@@ -29,17 +54,18 @@ export function KeystoreManagement() {
   const [decryptedInfo, setDecryptedInfo] = useState<DecryptedCredentials | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
+  const [membershipInfo, setMembershipInfo] = useState<ExtendedMembershipInfo | null>(null);
 
   React.useEffect(() => {
     if (error) {
-      setGlobalError(error);
+      toast.error(error);
     }
-  }, [error, setGlobalError]);
+  }, [error]);
 
   const handleExportKeystoreCredential = async (hash: string) => {
     try {
       if (!exportPassword) {
-        setGlobalError('Please enter your keystore password to export');
+        toast.error('Please enter your keystore password to export');
         return;
       }
       const keystore = await exportCredential(hash, exportPassword);
@@ -47,7 +73,7 @@ export function KeystoreManagement() {
       setExportPassword('');
       setSelectedCredential(null);
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to export credential');
+      toast.error(err instanceof Error ? err.message : 'Failed to export credential');
     }
   };
 
@@ -56,10 +82,10 @@ export function KeystoreManagement() {
       const keystore = await readKeystoreFromFile();
       const success = importKeystore(keystore);
       if (!success) {
-        setGlobalError('Failed to import keystore');
+        toast.error('Failed to import keystore');
       }
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to import keystore');
+      toast.error(err instanceof Error ? err.message : 'Failed to import keystore');
     }
   };
 
@@ -67,17 +93,18 @@ export function KeystoreManagement() {
     try {
       removeCredential(hash);
     } catch (err) {
-      setGlobalError(err instanceof Error ? err.message : 'Failed to remove credential');
+      toast.error(err instanceof Error ? err.message : 'Failed to remove credential');
     }
   };
 
   const handleViewCredential = async (hash: string) => {
     if (!viewPassword) {
-      setGlobalError('Please enter your keystore password to view credential');
+      toast.error('Please enter your keystore password to view credential');
       return;
     }
     
     setIsDecrypting(true);
+    setMembershipInfo(null);
     
     try {
       const credential = await getDecryptedCredential(hash, viewPassword);
@@ -85,12 +112,14 @@ export function KeystoreManagement() {
       
       if (credential) {
         setDecryptedInfo(credential);
+        const info = await getMembershipInfo(hash, viewPassword);
+        setMembershipInfo(info as ExtendedMembershipInfo);
       } else {
-        setGlobalError('Could not decrypt credential. Please check your password and try again.');
+        toast.error('Could not decrypt credential. Please check your password and try again.');
       }
     } catch (err) {
       setIsDecrypting(false);
-      setGlobalError(err instanceof Error ? err.message : 'Failed to decrypt credential');
+      toast.error(err instanceof Error ? err.message : 'Failed to decrypt credential');
     }
   };
 
@@ -293,66 +322,29 @@ export function KeystoreManagement() {
                           
                           {/* Decrypted Information Display */}
                           {decryptedInfo && (
-                            <div className="mt-3 space-y-2 border-t border-terminal-border/40 pt-3 animate-in fade-in-50 duration-300">
-                              <div className="flex items-center mb-2">
-                                <span className="text-primary font-mono font-medium mr-2">{">"}</span>
-                                <h3 className="text-sm font-mono font-semibold text-primary">
-                                  Credential Details
-                                </h3>
-                              </div>
-                              <div className="space-y-2 text-xs font-mono">
-                                <div className="grid grid-cols-1 gap-2">
-                                  <div className="flex flex-col">
-                                    <span className="text-muted-foreground">ID Commitment:</span>
-                                    <div className="flex items-center mt-1">
-                                      <span className="break-all text-accent truncate">{decryptedInfo.identity.IDCommitment}</span>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-5 w-5 p-0 ml-1 text-muted-foreground hover:text-accent"
-                                        onClick={() => copyToClipboard(decryptedInfo.identity.IDCommitment.toString())}
-                                      >
-                                        <Copy className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col border-t border-terminal-border/20 pt-2">
-                                    <span className="text-muted-foreground">ID Nullifier:</span>
-                                    <div className="flex items-center mt-1">
-                                      <span className="break-all text-accent truncate">{decryptedInfo.identity.IDNullifier}</span>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-5 w-5 p-0 ml-1 text-muted-foreground hover:text-accent"
-                                        onClick={() => copyToClipboard(decryptedInfo.identity.IDNullifier.toString())}
-                                      >
-                                        <Copy className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col border-t border-terminal-border/20 pt-2">
-                                    <span className="text-muted-foreground">Membership Details:</span>
-                                    <div className="grid grid-cols-2 gap-4 mt-2">
-                                      <div>
-                                        <span className="text-muted-foreground text-xs">Chain ID:</span>
-                                        <div className="text-accent">{decryptedInfo.membership.chainId}</div>
-                                      </div>
-                                      <div>
-                                        <span className="text-muted-foreground text-xs">Rate Limit:</span>
-                                        <div className="text-accent">{decryptedInfo.membership.rateLimit}</div>
-                                      </div>
-                                    </div>
-                                  </div>
+                            <div className="space-y-4">
+                              <CredentialDetails
+                                decryptedInfo={decryptedInfo}
+                                copyToClipboard={copyToClipboard}
+                              />
+                              
+                              {membershipInfo && (
+                                <div className="flex flex-col border-t border-terminal-border/20 pt-2">
+                                  <MembershipDetails
+                                    membershipInfo={membershipInfo}
+                                    copyToClipboard={copyToClipboard}
+                                    hash={hash}
+                                  />
                                 </div>
-                                <Button
-                                  onClick={() => setDecryptedInfo(null)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="mt-2 text-xs text-muted-foreground hover:text-accent"
-                                >
-                                  Hide Details
-                                </Button>
-                              </div>
+                              )}
+                              <Button
+                                onClick={() => setDecryptedInfo(null)}
+                                variant="ghost"
+                                size="sm"
+                                className="mt-2 text-xs text-muted-foreground hover:text-accent"
+        >
+          Hide Details
+        </Button>
                             </div>
                           )}
                         </div>

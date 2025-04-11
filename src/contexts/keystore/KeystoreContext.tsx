@@ -11,6 +11,8 @@ interface KeystoreContextType {
   error: string | null;
   hasStoredCredentials: boolean;
   storedCredentialsHashes: string[];
+  decryptedCredentials: KeystoreEntity | null;
+  hideCredentials: () => void;
   saveCredentials: (credentials: KeystoreEntity, password: string) => Promise<string>;
   exportCredential: (hash: string, password: string) => Promise<Keystore>;
   exportEntireKeystore: (password: string) => Promise<void>;
@@ -26,6 +28,7 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedCredentialsHashes, setStoredCredentialsHashes] = useState<string[]>([]);
+  const [decryptedCredentials, setDecryptedCredentials] = useState<KeystoreEntity | null>(null);
 
   // Initialize keystore
   useEffect(() => {
@@ -91,6 +94,9 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     try {
       // Get the credential from the keystore
       const credential = await keystore.readCredential(hash, password);
+      if (credential) {
+        setDecryptedCredentials(credential);
+      }
       return credential || null;
     } catch (err) {
       console.error("Error reading credential:", err);

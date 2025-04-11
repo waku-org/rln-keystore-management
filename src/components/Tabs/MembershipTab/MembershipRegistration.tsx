@@ -2,20 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { RLNImplementationToggle } from '../../RLNImplementationToggle';
+import { RLNStatusIndicator } from '../../RLNStatusIndicator';
 import { KeystoreEntity } from '@waku/rln';
-import { useAppState } from '../../../contexts/AppStateContext';
 import { useRLN } from '../../../contexts/rln/RLNContext';
 import { useWallet } from '../../../contexts/wallet';
+import { useRLNImplementation } from '../../../contexts';
 import { RLNInitButton } from '../../RLNinitButton';
 import { TerminalWindow } from '../../ui/terminal-window';
 import { Slider } from '../../ui/slider';
 import { Button } from '../../ui/button';
 import { membershipRegistration, type ContentSegment } from '../../../content/index';
+import { toast } from 'sonner';
 
 export function MembershipRegistration() {
-  const { setGlobalError } = useAppState();
-  const { registerMembership, isInitialized, isStarted, rateMinLimit, rateMaxLimit, error } = useRLN();
+  const { registerMembership, isInitialized, isStarted, rateMinLimit, rateMaxLimit, error, isLoading } = useRLN();
   const { isConnected, chainId } = useWallet();
+  const { implementation } = useRLNImplementation();
 
   const [rateLimit, setRateLimit] = useState<number>(rateMinLimit);
   const [isRegistering, setIsRegistering] = useState(false);
@@ -34,9 +36,9 @@ export function MembershipRegistration() {
 
   useEffect(() => {
     if (error) {
-      setGlobalError(error);
+      toast.error(error);
     }
-  }, [error, setGlobalError]);
+  }, [error]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,9 +103,12 @@ export function MembershipRegistration() {
   return (
     <div className="space-y-6 max-w-full">
       <TerminalWindow className="w-full">
-        <h2 className="text-lg font-mono font-medium text-primary mb-4 cursor-blink">
-          {membershipRegistration.title}
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-mono font-medium text-primary cursor-blink">
+            {membershipRegistration.title}
+          </h2>
+          <RLNStatusIndicator />
+        </div>
         <div className="space-y-6">
           <div className="border-b border-terminal-border pb-6">
             <RLNImplementationToggle />
@@ -155,9 +160,11 @@ export function MembershipRegistration() {
           </div>
 
           <div className="border-t border-terminal-border pt-6 mt-4">
-            <div className="flex items-center space-x-2">
-              <RLNInitButton />
-            </div>
+            {implementation === 'standard' && !isInitialized && !isStarted && (
+              <div className="flex items-center space-x-2">
+                <RLNInitButton />
+              </div>
+            )}
 
             {!isConnected ? (
               <div className="text-warning-DEFAULT font-mono text-sm mt-4 flex items-center">
@@ -167,7 +174,7 @@ export function MembershipRegistration() {
             ) : !isInitialized || !isStarted ? (
               <div className="text-warning-DEFAULT font-mono text-sm mt-4 flex items-center">
                 <span className="mr-2">ℹ️</span>
-                {membershipRegistration.initializePrompt}
+                {implementation === 'light' && isLoading ? 'Initializing Light RLN...' : membershipRegistration.initializePrompt}
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">

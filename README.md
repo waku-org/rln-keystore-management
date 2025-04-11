@@ -41,3 +41,4 @@ If you encounter an "ERC20: insufficient allowance" error, it means the token ap
 ## TODO
 - [ ] add info about using with nwaku/nwaku-compose/waku-simulator
 - [x] fix rate limit fetch
+- [ ] fix membership management methods
