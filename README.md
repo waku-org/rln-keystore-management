@@ -65,3 +65,12 @@ If you encounter an "ERC20: insufficient allowance" error, it means the token ap
 - [ ] define epoch / quanity epoch
 - [x] alias for individual credentials
 - [x] remove export keystore method (if >1 credentials in keystore)
+
+## CI/CD
+
+PRs should be made for `develop` branch and `master` should be [rebased](https://git-scm.com/book/en/v2/Git-Branching-Rebasing) on `develop` once changes are verified.
+
+- [CI builds](https://ci.infra.status.im/job/website/job/rln.waku.org/) `master` and pushes to `deploy-master` branch, which is hosted at <https://rln.waku.org/>.
+- [CI builds](https://ci.infra.status.im/job/website/job/dev-rln.waku.org/) `develop` and pushes to `deploy-develop` branch, which is hosted at <https://dev-rln.waku.org/>.
+
+The hosting is done using [`nextjs-website` Ansible role in `infra-sites`](https://github.com/status-im/infra-sites/blob/master/ansible/vars/press/rln_waku_org.yml).
