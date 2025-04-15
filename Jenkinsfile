@@ -7,8 +7,13 @@ pipeline {
   parameters {
     string(
       name: 'IMAGE_TAG',
-      defaultValue: params.IMAGE_TAG ?: '',
+      defaultValue: params.IMAGE_TAG ?: deployBranch(),
       description: 'Optional Docker image tag to push.'
+    )
+    string(
+      name: 'DOCKER_REGISTRY',
+      description: 'Docker registry ',
+      defaultValue: params.DOCKER_REGISTRY ?: 'harbor.status.im',
     )
   }
 
@@ -22,22 +27,26 @@ pipeline {
   }
 
   environment {
-    IMAGE_NAME = 'statusteam/rln-keystore-management'
-    NEXT_PUBLIC_SITE_URL = "https://${env.JOB_BASE_NAME}"
+    IMAGE_NAME = 'wakuorg/rln-keystore-management'
+    NEXT_PUBLIC_SITE_URL = "https://${deployDomain()}"
   }
 
   stages {
     stage('Build') {
       steps {
         script {
-          image = docker.build("${IMAGE_NAME}:${GIT_COMMIT.take(8)}")
+          image = docker.build(
+            "${DOCKER_REGISTRY}/${IMAGE_NAME}:${GIT_COMMIT.take(8)}"
+          )
         }
       }
     }
 
     stage('Push') {
       steps { script {
-        withDockerRegistry([credentialsId: 'dockerhub-statusteam-auto', url: '']) {
+        withDockerRegistry([
+          credentialsId: 'harbor-wakuorg-robot', url: "https://${DOCKER_REGISTRY}",
+        ]) {
           image.push()
         }
       } }
@@ -46,7 +55,9 @@ pipeline {
     stage('Deploy') {
       when { expression { params.IMAGE_TAG != '' } }
       steps { script {
-        withDockerRegistry([credentialsId: 'dockerhub-statusteam-auto', url: '']) {
+        withDockerRegistry([
+          credentialsId: "harbor-wakuorg-robot", url: "https://${DOCKER_REGISTRY}",
+        ]) {
           image.push(params.IMAGE_TAG)
         }
       } }
@@ -57,3 +68,7 @@ pipeline {
     cleanup { cleanWs() }
   }
 }
+
+def isMasterBranch() { GIT_BRANCH ==~ /.*master/ }
+def deployBranch() { isMasterBranch() ? 'deploy-master' : 'deploy-develop' }
+def deployDomain() { isMasterBranch() ? 'waku.org' : 'dev.waku.org' }
