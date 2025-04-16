@@ -1,26 +1,24 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { createRLN,  LINEA_CONTRACT, RLNInstance } from '@waku/rln';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import {   RLNCredentialsManager } from '@waku/rln';
 import { ethers } from 'ethers';
-import { ensureLineaSepoliaNetwork, ERC20_ABI, SIGNATURE_MESSAGE } from '../../../utils/network';
-import { RLNContextType } from './types';
+import { ensureLineaSepoliaNetwork, ERC20_ABI, SIGNATURE_MESSAGE } from '../../utils/network';
 import { useWallet } from '@/contexts';
-
-
+import { RLNContextType } from './types';
 
 const RLNContext = createContext<RLNContextType | undefined>(undefined);
 
 export function RLNProvider({ children }: { children: ReactNode }) {
   const { isConnected, signer } = useWallet();
-  const [rln, setRln] = useState<RLNInstance | null>(null);
+  const [rln, setRln] = useState<RLNCredentialsManager | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rateMinLimit, setRateMinLimit] = useState(0);
   const [rateMaxLimit, setRateMaxLimit] = useState(0);
 
-  const initializeRLN = async () => {
+  const initializeRLN = useCallback(async () => {
     console.log("InitializeRLN called. Connected:", isConnected, "Signer available:", !!signer);
     
     try {
@@ -30,7 +28,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("Creating RLN instance...");
         
         try {
-          const rlnInstance = await createRLN();
+          const rlnInstance = new RLNCredentialsManager();
           
           console.log("RLN instance created successfully:", !!rlnInstance);
           setRln(rlnInstance);
@@ -45,6 +43,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
         console.log("RLN instance already exists, skipping creation");
       }
       
+      // Start RLN if wallet is connected
       if (isConnected && signer && rln && !isStarted) {
         console.log("Starting RLN with signer...");
         try {
@@ -53,12 +52,16 @@ export function RLNProvider({ children }: { children: ReactNode }) {
           setIsStarted(true);
           console.log("RLN started successfully, isStarted set to true");
 
-            const minRate = await rln.contract?.getMinRateLimit();
-            const maxRate = await rln.contract?.getMaxRateLimit();
-            setRateMinLimit(minRate || 0);
-            setRateMaxLimit(maxRate || 0);
-            console.log("Min rate:", minRate);
-            console.log("Max rate:", maxRate);
+          const minRate = await rln.contract?.getMinRateLimit();
+          const maxRate = await rln.contract?.getMaxRateLimit();
+          if (!minRate || !maxRate) {
+            throw new Error("Failed to get rate limits from contract");
+          }
+
+          setRateMinLimit(minRate);
+          setRateMaxLimit(maxRate);
+          console.log("Min rate:", minRate);
+          console.log("Max rate:", maxRate);
         } catch (startErr) {
           console.error("Error starting RLN:", startErr);
           throw startErr;
@@ -75,7 +78,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       console.error('Error in initializeRLN:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize RLN');
     }
-  };
+  }, [isConnected, signer, rln, isStarted]);
 
   const registerMembership = async (rateLimit: number) => {
     console.log("registerMembership called with rate limit:", rateLimit);
@@ -96,7 +99,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
           error: `Rate limit must be between ${rateMinLimit} and ${rateMaxLimit}` 
         };
       }
-      rln.contract?.setRateLimit(rateLimit);
+      await rln.contract?.setRateLimit(rateLimit);
       
       // Ensure we're on the correct network
       const isOnLineaSepolia = await ensureLineaSepoliaNetwork(signer);
@@ -112,7 +115,7 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       }
       
       const contractAddress = rln.contract.address;
-      const tokenAddress = LINEA_CONTRACT.address;
+      const tokenAddress = '0x185A0015aC462a0aECb81beCc0497b649a64B9ea'; // Linea Sepolia token address
       
       // Create token contract instance
       const tokenContract = new ethers.Contract(
@@ -178,6 +181,15 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       return { success: false, error: errorMsg };
     }
   };
+
+  // Initialize RLN when wallet connects
+  useEffect(() => {
+    console.log("Wallet connection state changed:", { isConnected, hasSigner: !!signer });
+    if (isConnected && signer) {
+      console.log("Wallet connected, attempting to initialize RLN");
+      initializeRLN();
+    }
+  }, [isConnected, signer, initializeRLN]);
 
   return (
     <RLNContext.Provider

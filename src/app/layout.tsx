@@ -7,7 +7,7 @@ import { Toaster } from "../components/ui/toaster";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 
-import {  WalletProvider, RLNImplementationProvider, KeystoreProvider, RLNProvider } from "../contexts/index";
+import { WalletProvider, KeystoreProvider, RLNProvider } from "../contexts/index";
 import { Header } from "../components/Header";
 import { AppStateProvider } from "../contexts/AppStateContext";
 import { Footer } from "@/components/Footer";
@@ -51,20 +51,18 @@ export default function RootLayout({ children }: RootLayoutProps) {
         >
           <AppStateProvider>
             <WalletProvider>
-              <RLNImplementationProvider>
-                <KeystoreProvider>
-                  <RLNProvider>
-                    <div className="relative flex min-h-screen flex-col">
-                      <Header />
-                      <main className="flex-1 container mx-auto py-8">
-                        {children}
-                      </main>
-                      <Footer />
-                    </div>
-                    <Toaster />
-                  </RLNProvider>
-                </KeystoreProvider>
-              </RLNImplementationProvider>
+              <KeystoreProvider>
+                <RLNProvider>
+                  <div className="relative flex min-h-screen flex-col">
+                    <Header />
+                    <main className="flex-1 container mx-auto py-8">
+                      {children}
+                    </main>
+                    <Footer />
+                  </div>
+                  <Toaster />
+                </RLNProvider>
+              </KeystoreProvider>
             </WalletProvider>
           </AppStateProvider>
         </ThemeProvider>

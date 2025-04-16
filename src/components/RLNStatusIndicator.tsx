@@ -2,12 +2,10 @@
 
 import React from 'react';
 import { useRLN } from '../contexts';
-import { useRLNImplementation } from '../contexts';
 import { useWallet } from '../contexts';
 
 export function RLNStatusIndicator() {
   const { isInitialized, isStarted, isLoading, error } = useRLN();
-  const { implementation } = useRLNImplementation();
   const { isConnected, chainId } = useWallet();
 
   // Debug logging
@@ -17,8 +15,7 @@ export function RLNStatusIndicator() {
     isInitialized,
     isStarted,
     isLoading,
-    error,
-    implementation
+    error
   });
 
   const getStatusColor = () => {
@@ -37,10 +34,10 @@ export function RLNStatusIndicator() {
 
   const getStatusText = () => {
     if (error) return 'Error';
-    if (isLoading) return `Initializing ${implementation} RLN...`;
+    if (isLoading) return 'Initializing RLN...';
     if (!isConnected) return 'Connect Wallet';
     if (chainId !== 59141) return 'Switch to Linea Sepolia';
-    if (isInitialized && isStarted) return `RLN Active`;
+    if (isInitialized && isStarted) return 'RLN Active';
     return 'RLN Inactive';
   };
 

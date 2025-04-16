@@ -2,8 +2,6 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { KeystoreEntity, MembershipInfo, RLNCredentialsManager } from '@waku/rln';
-import { createRLNImplementation } from './implementations';
-import { useRLNImplementation } from './RLNImplementationContext';
 import { ethers } from 'ethers';
 import { useKeystore } from '../keystore';
 import { ERC20_ABI, LINEA_SEPOLIA_CONFIG, ensureLineaSepoliaNetwork } from '../../utils/network';
@@ -40,7 +38,6 @@ interface RLNContextType {
 const RLNContext = createContext<RLNContextType | undefined>(undefined);
 
 export function RLNProvider({ children }: { children: ReactNode }) {
-  const { implementation } = useRLNImplementation();
   const [rln, setRln] = useState<RLNCredentialsManager | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isStarted, setIsStarted] = useState(false);
@@ -96,20 +93,6 @@ export function RLNProvider({ children }: { children: ReactNode }) {
     };
   }, []);
   
-  // Reset RLN state when implementation changes
-  useEffect(() => {
-    console.log('Implementation changed, resetting state:', {
-      oldRln: !!rln,
-      oldIsInitialized: isInitialized,
-      oldIsStarted: isStarted,
-      newImplementation: implementation
-    });
-    setRln(null);
-    setIsInitialized(false);
-    setIsStarted(false);
-    setError(null);
-  }, [implementation]);
-  
   const initializeRLN = useCallback(async () => {
     console.log("InitializeRLN called. Connected:", isConnected, "Signer available:", !!signer);
     
@@ -117,19 +100,16 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       setError(null);
       setIsLoading(true);
       
-      let rlnInstance = rln;
+      const rlnInstance = rln;
       
       if (!rlnInstance) {
-        console.log(`Creating RLN ${implementation} instance...`);
-        
+        console.log("Creating RLN light instance...");
         try {
-          rlnInstance = await createRLNImplementation(implementation);
-          
           console.log("RLN instance created successfully:", !!rlnInstance);
           setRln(rlnInstance);
-          
           setIsInitialized(true);
-          console.log("isInitialized set to true");
+          setIsStarted(true);
+          console.log("isInitialized and isStarted set to true");
         } catch (createErr) {
           console.error("Error creating RLN instance:", createErr);
           throw createErr;
@@ -137,39 +117,22 @@ export function RLNProvider({ children }: { children: ReactNode }) {
       } else {
         console.log("RLN instance already exists, skipping creation");
       }
-      
-      if (isConnected && signer && rlnInstance && !isStarted) {
-        console.log("Starting RLN with signer...");
-        try {          
-          await rlnInstance.start({ signer });
-          
-          setIsStarted(true);
-          console.log("RLN started successfully, isStarted set to true");
 
-          try {
-            const minLimit = await rlnInstance.contract?.getMinRateLimit();
-            const maxLimit = await rlnInstance.contract?.getMaxRateLimit();
-            if (minLimit !== undefined && maxLimit !== undefined) {
-              setRateMinLimit(minLimit);
-              setRateMaxLimit(maxLimit);
-              console.log("Rate limits fetched:", { min: minLimit, max: maxLimit });
-            } else {
-              throw new Error("Rate limits not available");
-            }
-          } catch (limitErr) {
-            console.warn("Could not fetch rate limits:", limitErr);
+      // Fetch rate limits if available
+      if (rlnInstance && rlnInstance.contract) {
+        try {
+          const minLimit = await rlnInstance.contract.getMinRateLimit();
+          const maxLimit = await rlnInstance.contract.getMaxRateLimit();
+          if (minLimit !== undefined && maxLimit !== undefined) {
+            setRateMinLimit(minLimit);
+            setRateMaxLimit(maxLimit);
+            console.log("Rate limits fetched:", { min: minLimit, max: maxLimit });
+          } else {
+            throw new Error("Rate limits not available");
           }
-        } catch (startErr) {
-          console.error("Error starting RLN:", startErr);
-          throw startErr;
+        } catch (limitErr) {
+          console.warn("Could not fetch rate limits:", limitErr);
         }
-      } else {
-        console.log("Skipping RLN start because:", {
-          isConnected,
-          hasSigner: !!signer,
-          hasRln: !!rlnInstance,
-          isAlreadyStarted: isStarted
-        });
       }
     } catch (err) {
       console.error('Error in initializeRLN:', err);
@@ -177,23 +140,22 @@ export function RLNProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, signer, implementation, rln, isStarted]);
+  }, [isConnected, signer, rln, isStarted]);
 
   // Auto-initialize effect for Light implementation
   useEffect(() => {
     console.log('Auto-init check:', {
-      implementation,
       isConnected,
       hasSigner: !!signer,
       isInitialized,
       isStarted,
       isLoading
     });
-    if (implementation === 'light' && isConnected && signer && !isInitialized && !isStarted && !isLoading) {
+    if (isConnected && signer && !isInitialized && !isStarted && !isLoading) {
       console.log('Auto-initializing Light RLN implementation...');
       initializeRLN();
     }
-  }, [implementation, isConnected, signer, isInitialized, isStarted, isLoading, initializeRLN]);
+  }, [isConnected, signer, isInitialized, isStarted, isLoading, initializeRLN]);
 
   const getCurrentRateLimit = async (): Promise<number | null> => {
     try {
