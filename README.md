@@ -2,6 +2,21 @@
 
 Application to manage Waku RLN keystores.
 
+## Static Export & Deployment
+
+This app is a fully static site. To build and deploy:
+
+1. Install dependencies:
+   ```sh
+   npm install
+   ```
+2. Build the static site:
+   ```sh
+   npm run build
+   ```
+   The static site will be output to the `out/` directory.
+3. Deploy the contents of the `out/` directory to any static host (e.g., Netlify, Vercel static, GitHub Pages, S3, etc.).
+
 ## Overview
 
 This application provides an interface for managing keystores for Waku's rate-limiting nullifier (RLN) functionality. It integrates with MetaMask for wallet connectivity.
