@@ -8,8 +8,8 @@ import { KeystoreManagement } from '../components/Tabs/KeystoreTab/KeystoreManag
 export default function Home() {
   return (
     <Layout>
-      <MembershipRegistration />
-      <KeystoreManagement />
+      <MembershipRegistration tabId="membership" />
+      <KeystoreManagement tabId="keystore" />
     </Layout>
   );
 }

@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-};
+  images: {
+    domains: [
+      'waku.org',
+      'logos.co',
+      'contributors.free.technology'
+    ],
+  },
+  reactStrictMode: true,
+}
 
-export default nextConfig;
+module.exports = nextConfig 

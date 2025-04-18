@@ -31,7 +31,12 @@ interface ExtendedMembershipInfo extends Omit<MembershipInfo, 'state'> {
   token: string;
 }
 
-export function KeystoreManagement() {
+interface KeystoreManagementProps {
+  tabId?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function KeystoreManagement({ tabId: _tabId }: KeystoreManagementProps) {
   const { 
     hasStoredCredentials, 
     storedCredentialsHashes,

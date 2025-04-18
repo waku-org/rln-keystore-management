@@ -11,7 +11,12 @@ import { Button } from '../../ui/button';
 import { membershipRegistration, type ContentSegment } from '../../../content/index';
 import { toast } from 'sonner';
 
-export function MembershipRegistration() {
+interface MembershipRegistrationProps {
+  tabId?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function MembershipRegistration({ tabId: _tabId }: MembershipRegistrationProps) {
   const { registerMembership, isInitialized, isStarted, rateMinLimit, rateMaxLimit, error, isLoading } = useRLN();
   const { isConnected, chainId } = useWallet();
 

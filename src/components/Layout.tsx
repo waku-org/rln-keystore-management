@@ -15,20 +15,15 @@ const tabs = [
   },
 ];
 
-const componentToTabId: Record<string, string> = {
-  MembershipRegistration: 'membership',
-  KeystoreManagement: 'keystore',
-};
-
 export function Layout({ children }: { children: React.ReactNode }) {
   const { activeTab, setActiveTab } = useAppState();
   const childrenArray = Children.toArray(children);
 
   const getTabContent = (tabId: string) => {
     return childrenArray.find((child) => {
-      if (isValidElement(child) && typeof child.type === 'function') {
-        const componentName = child.type.name;
-        return componentToTabId[componentName] === tabId;
+      if (isValidElement(child)) {
+        const props = child.props as { tabId?: string };
+        return props.tabId === tabId;
       }
       return false;
     });
