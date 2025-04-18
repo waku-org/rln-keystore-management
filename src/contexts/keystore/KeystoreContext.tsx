@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { Keystore, KeystoreEntity } from '@waku/rln';
 
 export const LOCAL_STORAGE_KEYSTORE_KEY = 'waku-rln-keystore';
+export const LOCAL_STORAGE_ALIASES_KEY = 'waku-rln-keystore-aliases';
 
 interface KeystoreContextType {
   keystore: Keystore | null;
@@ -11,6 +12,7 @@ interface KeystoreContextType {
   error: string | null;
   hasStoredCredentials: boolean;
   storedCredentialsHashes: string[];
+  credentialAliases: { [hash: string]: string };
   decryptedCredentials: KeystoreEntity | null;
   hideCredentials: () => void;
   saveCredentials: (credentials: KeystoreEntity, password: string) => Promise<string>;
@@ -19,6 +21,7 @@ interface KeystoreContextType {
   importKeystore: (keystore: Keystore) => boolean;
   removeCredential: (hash: string) => void;
   getDecryptedCredential: (hash: string, password: string) => Promise<KeystoreEntity | null>;
+  setCredentialAlias: (hash: string, alias: string) => void;
 }
 
 const KeystoreContext = createContext<KeystoreContextType | undefined>(undefined);
@@ -28,12 +31,14 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storedCredentialsHashes, setStoredCredentialsHashes] = useState<string[]>([]);
+  const [credentialAliases, setCredentialAliases] = useState<{ [hash: string]: string }>({});
   const [decryptedCredentials, setDecryptedCredentials] = useState<KeystoreEntity | null>(null);
 
-  // Initialize keystore
-  useEffect(() => { 
+  // Initialize keystore and aliases
+  useEffect(() => {
     try {
       const storedKeystore = localStorage.getItem(LOCAL_STORAGE_KEYSTORE_KEY);
+      const storedAliases = localStorage.getItem(LOCAL_STORAGE_ALIASES_KEY);
       let keystoreInstance: Keystore;
 
       if (storedKeystore) {
@@ -49,6 +54,18 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
 
       setKeystore(keystoreInstance);
       setStoredCredentialsHashes(keystoreInstance.keys());
+
+      if (storedAliases) {
+        try {
+          setCredentialAliases(JSON.parse(storedAliases));
+        } catch (aliasErr) {
+          console.error("Error parsing aliases from localStorage:", aliasErr);
+          setCredentialAliases({});
+        }
+      } else {
+        setCredentialAliases({});
+      }
+
       setIsInitialized(true);
     } catch (err) {
       console.error("Error initializing keystore:", err);
@@ -66,6 +83,17 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [keystore, isInitialized]);
+
+  // Save aliases to localStorage whenever they change
+  useEffect(() => {
+    if (isInitialized) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_ALIASES_KEY, JSON.stringify(credentialAliases));
+      } catch (err) {
+        console.warn("Could not save aliases to localStorage:", err);
+      }
+    }
+  }, [credentialAliases, isInitialized]);
 
   const saveCredentials = async (credentials: KeystoreEntity, password: string): Promise<string> => {
     if (!keystore) {
@@ -163,11 +191,16 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const importKeystore = (keystore: Keystore): boolean => {
+  const importKeystore = (importedKeystore: Keystore): boolean => {
     try {
-      setKeystore(keystore);
-      setStoredCredentialsHashes(keystore.keys());
-      localStorage.setItem(LOCAL_STORAGE_KEYSTORE_KEY, keystore.toString());
+      const newAliases = {};
+      setCredentialAliases(newAliases);
+      localStorage.setItem(LOCAL_STORAGE_ALIASES_KEY, JSON.stringify(newAliases));
+
+      setKeystore(importedKeystore);
+      setStoredCredentialsHashes(importedKeystore.keys());
+      localStorage.setItem(LOCAL_STORAGE_KEYSTORE_KEY, importedKeystore.toString());
+
       return true;
     } catch (err) {
       console.error("Error importing keystore:", err);
@@ -182,8 +215,24 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     }
 
     keystore.removeCredential(hash);
-    setStoredCredentialsHashes(keystore.keys());
+    const remainingHashes = keystore.keys();
+    setStoredCredentialsHashes(remainingHashes);
     localStorage.setItem(LOCAL_STORAGE_KEYSTORE_KEY, keystore.toString());
+
+    setCredentialAliases(prev => {
+      const newAliases = { ...prev };
+      delete newAliases[hash];
+      localStorage.setItem(LOCAL_STORAGE_ALIASES_KEY, JSON.stringify(newAliases));
+      return newAliases;
+    });
+  };
+
+  const setCredentialAlias = (hash: string, alias: string) => {
+    setCredentialAliases(prev => {
+      const newAliases = { ...prev, [hash]: alias };
+      localStorage.setItem(LOCAL_STORAGE_ALIASES_KEY, JSON.stringify(newAliases));
+      return newAliases;
+    });
   };
 
   const contextValue: KeystoreContextType = {
@@ -192,6 +241,7 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     error,
     hasStoredCredentials: storedCredentialsHashes.length > 0,
     storedCredentialsHashes,
+    credentialAliases,
     saveCredentials,
     exportCredential,
     exportEntireKeystore,
@@ -199,6 +249,7 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     removeCredential,
     getDecryptedCredential,
     decryptedCredentials,
+    setCredentialAlias,
     hideCredentials: () => {},
   };
 

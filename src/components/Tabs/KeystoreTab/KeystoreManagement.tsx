@@ -7,13 +7,14 @@ import { readKeystoreFromFile, saveKeystoreCredentialToFile } from '../../../uti
 import { DecryptedCredentials, MembershipInfo, MembershipState } from '@waku/rln';
 import { TerminalWindow } from '../../ui/terminal-window';
 import { Button } from '../../ui/button';
-import { Copy, Eye, Download, Trash2, ArrowDownToLine } from 'lucide-react';
+import { Copy, Eye, Download, Trash2, ArrowDownToLine, Pencil, Check, X } from 'lucide-react';
 import { KeystoreExporter } from '../../KeystoreExporter';
 import { keystoreManagement, type ContentSegment } from '../../../content/index';
 import { ethers } from 'ethers';
 import { toast } from 'sonner';
 import { CredentialDetails } from '@/components/CredentialDetails';
 import { MembershipDetails } from '@/components/MembershipDetails';
+import { Input } from "@/components/ui/input";
 
 interface ExtendedMembershipInfo extends Omit<MembershipInfo, 'state'> {
   address: string;
@@ -40,6 +41,8 @@ export function KeystoreManagement({ tabId: _tabId }: KeystoreManagementProps) {
   const { 
     hasStoredCredentials, 
     storedCredentialsHashes,
+    credentialAliases,
+    setCredentialAlias,
     error,
     exportCredential,
     importKeystore,
@@ -59,6 +62,8 @@ export function KeystoreManagement({ tabId: _tabId }: KeystoreManagementProps) {
   const [isDecrypting, setIsDecrypting] = useState(false);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [membershipInfo, setMembershipInfo] = useState<ExtendedMembershipInfo | null>(null);
+  const [editingAliasHash, setEditingAliasHash] = useState<string | null>(null);
+  const [currentAliasInput, setCurrentAliasInput] = useState<string>('');
 
   React.useEffect(() => {
     if (error) {
@@ -239,146 +244,189 @@ export function KeystoreManagement({ tabId: _tabId }: KeystoreManagementProps) {
             
             {hasStoredCredentials ? (
               <div className="space-y-4">
-                {storedCredentialsHashes.map((hash) => (
-                  <div 
-                    key={hash} 
-                    className="p-4 rounded-md border border-terminal-border bg-terminal-background/30 hover:border-terminal-border/80 transition-colors"
-                  >
-                    <div className="flex flex-col space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <code className="text-sm text-muted-foreground font-mono">
-                            {hash.slice(0, 10)}...{hash.slice(-6)}
-                          </code>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className={`h-6 w-6 p-0 ${copiedHash === hash ? 'text-success-DEFAULT' : 'text-muted-foreground hover:text-primary'}`}
-                            onClick={() => copyToClipboard(hash)}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
-                          {copiedHash === hash && (
-                            <span className="text-xs text-success-DEFAULT">Copied!</span>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            onClick={() => {
-                              setViewingCredential(hash === viewingCredential ? null : hash);
-                              setSelectedCredential(null);
-                              setViewPassword('');
-                              setDecryptedInfo(null);
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="text-accent hover:text-accent hover:border-accent flex items-center gap-1 py-1"
-                          >
-                            <Eye className="w-3 h-3" />
-                            <span>{keystoreManagement.buttons.view}</span>
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setSelectedCredential(hash === selectedCredential ? null : hash);
-                              setViewingCredential(null);
-                              setExportPassword('');
-                            }}
-                            variant="outline"
-                            size="sm"
-                            className="text-primary hover:text-primary hover:border-primary flex items-center gap-1 py-1"
-                          >
-                            <Download className="w-3 h-3" />
-                            <span>Export</span>
-                          </Button>
-                          <Button
-                            onClick={() => handleRemoveCredential(hash)}
-                            variant="outline"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:border-destructive flex items-center gap-1 py-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            <span>Remove</span>
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* View Credential Section */}
-                      {viewingCredential === hash && (
-                        <div className="mt-3 space-y-3 border-t border-terminal-border/40 pt-3 animate-in fade-in-50 duration-300">
-                          <div className="flex gap-2">
-                            <input
-                              type="password"
-                              value={viewPassword}
-                              onChange={(e) => setViewPassword(e.target.value)}
-                              placeholder="Enter credential password"
-                              className="flex-1 px-3 py-2 border border-terminal-border rounded-md bg-terminal-background text-foreground font-mono focus:ring-1 focus:ring-accent focus:border-accent text-sm"
-                              disabled={isDecrypting}
-                            />
-                            <Button
-                              onClick={() => handleViewCredential(hash)}
-                              disabled={!viewPassword || isDecrypting}
-                              variant="terminal"
-                              size="sm"
-                            >
-                              {isDecrypting ? 'Decrypting...' : 'Decrypt'}
-                            </Button>
-                          </div>
-                          
-                          {/* Decrypted Information Display */}
-                          {decryptedInfo && (
-                            <div className="space-y-4">
-                              <CredentialDetails
-                                decryptedInfo={decryptedInfo}
-                                copyToClipboard={copyToClipboard}
+                {storedCredentialsHashes.map((hash) => {
+                  const currentAlias = credentialAliases[hash] || '';
+                  const displayValue = currentAlias || `${hash.substring(0, 6)}...${hash.substring(hash.length - 4)}`;
+                  const isEditing = editingAliasHash === hash;
+
+                  return (
+                    <div
+                      key={hash}
+                      className="p-4 rounded-md border border-terminal-border bg-terminal-background/30 hover:border-terminal-border/80 transition-colors"
+                    >
+                      <div className="flex flex-col space-y-3">
+                        <div className="flex items-center justify-between">
+                          {/* Display Alias/Hash or Edit Input */}
+                          {isEditing ? (
+                            <div className="flex items-center space-x-2 flex-grow mr-2">
+                              <Input 
+                                type="text"
+                                value={currentAliasInput}
+                                onChange={(e) => setCurrentAliasInput(e.target.value)}
+                                placeholder="Enter alias..."
+                                className="h-8 text-sm flex-grow"
                               />
-                              
-                              {membershipInfo && (
-                                <div className="flex flex-col border-t border-terminal-border/20 pt-2">
-                                  <MembershipDetails
-                                    membershipInfo={membershipInfo}
-                                    copyToClipboard={copyToClipboard}
-                                    hash={hash}
-                                  />
-                                </div>
-                              )}
                               <Button
-                                onClick={() => setDecryptedInfo(null)}
                                 variant="ghost"
-                                size="sm"
-                                className="mt-2 text-xs text-muted-foreground hover:text-accent"
-        >
-          Hide Details
-        </Button>
+                                size="icon"
+                                className="h-7 w-7 text-primary hover:text-primary"
+                                onClick={() => {
+                                  setCredentialAlias(hash, currentAliasInput);
+                                  setEditingAliasHash(null);
+                                  setCurrentAliasInput('');
+                                }}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => {
+                                  setEditingAliasHash(null);
+                                  setCurrentAliasInput('');
+                                }}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2 flex-grow">
+                              <code className={`text-sm font-mono ${currentAlias ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {displayValue}
+                              </code>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-5 w-5 p-0 ml-1 text-muted-foreground hover:text-accent"
+                                onClick={() => {
+                                  setEditingAliasHash(hash);
+                                  setCurrentAliasInput(currentAlias); // Pre-fill input if alias exists
+                                }}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-5 w-5 p-0 text-muted-foreground hover:text-accent"
+                                onClick={() => copyToClipboard(hash)}
+                                title="Copy Full Hash"
+                              >
+                                <Copy className="h-3 w-3" />
+                                {copiedHash === hash && <span className="text-xs ml-1">Copied!</span>}
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Action Buttons (View, Export, Remove) - only show if not editing */}
+                          {!isEditing && (
+                            <div className="flex items-center space-x-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-accent"
+                                onClick={() => {
+                                  setViewingCredential(hash);
+                                  // Optionally clear previous details or require password again
+                                  setDecryptedInfo(null); 
+                                  setMembershipInfo(null);
+                                  setViewPassword(''); // Clear password for safety
+                                }}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-accent"
+                                onClick={() => setSelectedCredential(hash)} // Set selected for export modal
+                                title="Export Credential"
+                              >
+                                <Download className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleRemoveCredential(hash)}
+                                title="Remove Credential"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           )}
                         </div>
-                      )}
-                      
-                      {/* Export Credential Section */}
-                      {selectedCredential === hash && (
-                        <div className="mt-3 space-y-3 border-t border-terminal-border/40 pt-3 animate-in fade-in-50 duration-300">
-                          <input
-                            type="password"
-                            value={exportPassword}
-                            onChange={(e) => setExportPassword(e.target.value)}
-                            placeholder="Enter keystore password"
-                            className="w-full px-3 py-2 border border-terminal-border rounded-md bg-terminal-background text-foreground font-mono focus:ring-1 focus:ring-primary focus:border-primary text-sm"
-                          />
-                          <Button
-                            onClick={() => handleExportKeystoreCredential(hash)}
-                            variant="default"
-                            size="sm"
-                            className="w-full font-mono"
-                            disabled={!exportPassword}
-                          >
-                            <Download className="w-3 h-3 mr-1" />
-                            Export Credential
-                          </Button>
-                        </div>
-                      )}
+
+                        {/* Password input for View Credential */}
+                        {viewingCredential === hash && !decryptedInfo && (
+                          <div className="flex items-center space-x-2 pt-2 border-t border-terminal-border/20">
+                            <Input
+                              type="password"
+                              value={viewPassword}
+                              onChange={(e) => setViewPassword(e.target.value)}
+                              placeholder="Enter password to view details"
+                              className="flex-grow h-8 text-sm"
+                            />
+                            <Button
+                              variant="terminal"
+                              size="sm"
+                              onClick={() => handleViewCredential(hash)}
+                              disabled={!viewPassword || isDecrypting}
+                            >
+                              {isDecrypting ? 'Decrypting...' : 'View'}
+                            </Button>
+                             <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setViewingCredential(null)} // Cancel view
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Password input for Export Credential */}
+                        {selectedCredential === hash && (
+                          <div className="flex items-center space-x-2 pt-2 border-t border-terminal-border/20">
+                            <Input
+                              type="password"
+                              value={exportPassword}
+                              onChange={(e) => setExportPassword(e.target.value)}
+                              placeholder="Enter password to export"
+                              className="flex-grow h-8 text-sm"
+                            />
+                            <Button
+                              variant="terminal"
+                              size="sm"
+                              onClick={() => handleExportKeystoreCredential(hash)}
+                              disabled={!exportPassword}
+                            >
+                              Confirm Export
+                            </Button>
+                             <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedCredential(null)} // Cancel export
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Decrypted Credential Details */}
+                        {viewingCredential === hash && decryptedInfo && (
+                          <CredentialDetails decryptedInfo={decryptedInfo} copyToClipboard={copyToClipboard} />
+                        )}
+                        {/* Membership Details */}
+                        {viewingCredential === hash && membershipInfo && (
+                            <MembershipDetails membershipInfo={membershipInfo} copyToClipboard={copyToClipboard} hash={hash} />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-sm text-muted-foreground font-mono bg-terminal-background/30 p-4 border border-terminal-border/50 rounded-md text-center">
