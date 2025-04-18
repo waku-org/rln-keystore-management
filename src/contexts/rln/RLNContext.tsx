@@ -95,52 +95,79 @@ export function RLNProvider({ children }: { children: ReactNode }) {
   
   const initializeRLN = useCallback(async () => {
     console.log("InitializeRLN called. Connected:", isConnected, "Signer available:", !!signer);
-    
+  
+    if (!isConnected || !signer) {
+      console.log("Cannot initialize RLN: Wallet not connected or signer not available.");
+      setError("Wallet not connected. Please connect your wallet.");
+      setIsLoading(false);
+      return; 
+    }
+  
+    setIsLoading(true);
+    setError(null);
+  
     try {
-      setError(null);
-      setIsLoading(true);
-      
-      const rlnInstance = rln;
-      
-      if (!rlnInstance) {
-        console.log("Creating RLN light instance...");
+      let currentRln = rln; 
+  
+      if (!currentRln) {
+        console.log("Creating RLN instance...");
         try {
-          console.log("RLN instance created successfully:", !!rlnInstance);
-          setRln(rlnInstance);
+          currentRln = new RLNCredentialsManager(); 
+          setRln(currentRln); 
           setIsInitialized(true);
-          setIsStarted(true);
-          console.log("isInitialized and isStarted set to true");
+          console.log("RLN instance created successfully.");
         } catch (createErr) {
           console.error("Error creating RLN instance:", createErr);
-          throw createErr;
+          setError(createErr instanceof Error ? createErr.message : 'Failed to create RLN instance');
+          setIsLoading(false);
+          return; 
         }
       } else {
-        console.log("RLN instance already exists, skipping creation");
+        console.log("RLN instance already exists, skipping creation.");
       }
-
-      // Fetch rate limits if available
-      if (rlnInstance && rlnInstance.contract) {
+  
+      if (currentRln && !isStarted) {
+        console.log("Starting RLN with signer...");
         try {
-          const minLimit = await rlnInstance.contract.getMinRateLimit();
-          const maxLimit = await rlnInstance.contract.getMaxRateLimit();
-          if (minLimit !== undefined && maxLimit !== undefined) {
-            setRateMinLimit(minLimit);
-            setRateMaxLimit(maxLimit);
-            console.log("Rate limits fetched:", { min: minLimit, max: maxLimit });
+          await currentRln.start({ signer }); 
+          setIsStarted(true);
+          console.log("RLN started successfully.");
+  
+          if (currentRln.contract) {
+            try {
+              const minLimit = await currentRln.contract.getMinRateLimit();
+              const maxLimit = await currentRln.contract.getMaxRateLimit();
+              if (minLimit !== undefined && maxLimit !== undefined) {
+                setRateMinLimit(minLimit);
+                setRateMaxLimit(maxLimit);
+                console.log("Rate limits fetched:", { min: minLimit, max: maxLimit });
+              } else {
+                console.warn("Could not fetch rate limits: undefined values returned.");
+              }
+            } catch (limitErr) {
+              console.warn("Could not fetch rate limits after start:", limitErr);
+              // Don't fail initialization for this, but log it.
+            }
           } else {
-            throw new Error("Rate limits not available");
+             console.warn("RLN contract not available after start, cannot fetch rate limits.");
           }
-        } catch (limitErr) {
-          console.warn("Could not fetch rate limits:", limitErr);
+  
+        } catch (startErr) {
+          console.error("Error starting RLN:", startErr);
+          setError(startErr instanceof Error ? startErr.message : 'Failed to start RLN');
+          setIsStarted(false); 
         }
+      } else if (isStarted) {
+         console.log("RLN already started.");
       }
+  
     } catch (err) {
       console.error('Error in initializeRLN:', err);
       setError(err instanceof Error ? err.message : 'Failed to initialize RLN');
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, signer, rln, isStarted]);
+  }, [isConnected, signer, rln, isStarted]); 
 
   // Auto-initialize effect for Light implementation
   useEffect(() => {
