@@ -63,5 +63,5 @@ If you encounter an "ERC20: insufficient allowance" error, it means the token ap
 - [x] fix rate limit fetch
 - [ ] fix membership management methods
 - [ ] define epoch / quanity epoch
-- [ ] alias for individual credentials
-- [ ] remove export keystore method (if >1 credentials in keystore)
+- [x] alias for individual credentials
+- [x] remove export keystore method (if >1 credentials in keystore)

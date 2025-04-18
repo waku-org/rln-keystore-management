@@ -12,6 +12,7 @@ interface KeystoreContextType {
   error: string | null;
   hasStoredCredentials: boolean;
   storedCredentialsHashes: string[];
+  credentialsCount: number;
   credentialAliases: { [hash: string]: string };
   decryptedCredentials: KeystoreEntity | null;
   hideCredentials: () => void;
@@ -241,6 +242,7 @@ export function KeystoreProvider({ children }: { children: ReactNode }) {
     error,
     hasStoredCredentials: storedCredentialsHashes.length > 0,
     storedCredentialsHashes,
+    credentialsCount: storedCredentialsHashes.length,
     credentialAliases,
     saveCredentials,
     exportCredential,

@@ -8,7 +8,7 @@ export function KeystoreExporter() {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [password, setPassword] = useState("");
   const [isExporting, setIsExporting] = useState(false);
-  const { exportEntireKeystore, hasStoredCredentials } = useKeystore();
+  const { exportEntireKeystore, hasStoredCredentials, credentialsCount } = useKeystore();
 
   const handleExport = async () => {
     if (!password) {
@@ -36,7 +36,7 @@ export function KeystoreExporter() {
           onClick={() => setShowPasswordInput(true)} 
           variant="terminal"
           className="group relative overflow-hidden"
-          disabled={!hasStoredCredentials}
+          disabled={!hasStoredCredentials || credentialsCount > 1}
         >
           <span className="relative z-10 flex items-center">
             <ArrowUpToLine className="w-4 h-4 mr-2" />
